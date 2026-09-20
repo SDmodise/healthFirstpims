@@ -182,7 +182,7 @@ public class LoginFrame extends JFrame {
 
         featurePanel.add(
                 createFeatureLabel(
-                        " ",
+                        "",
                         "Safe Medication Management"
                 )
         );
@@ -193,7 +193,7 @@ public class LoginFrame extends JFrame {
 
         featurePanel.add(
                 createFeatureLabel(
-                        " ",
+                        "",
                         "Efficient Pharmacy Operations"
                 )
         );
@@ -204,7 +204,7 @@ public class LoginFrame extends JFrame {
 
         featurePanel.add(
                 createFeatureLabel(
-                        " ",
+                        "",
                         "Reliable Inventory Control"
                 )
         );
