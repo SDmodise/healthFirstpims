@@ -1,6 +1,7 @@
 package pims.gui;
 
 import pims.components.Sidebar;
+import pims.util.DBConnection;
 import pims.dao.MedicineDAO;
 import pims.dao.SupplierDAO;
 import pims.dao.UserDAO;
@@ -12,6 +13,10 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.LocalDate;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class AdminDashboard extends JFrame {
 
@@ -110,10 +115,7 @@ public class AdminDashboard extends JFrame {
                     break;
 
                 case "Sales History":
-                    showPlaceholder(
-                            "Sales History",
-                            "Sales history will be available here."
-                    );
+                    showSalesHistoryPanel();
                     break;
 
                 case "Reports":
@@ -128,10 +130,7 @@ public class AdminDashboard extends JFrame {
                     break;
 
                 case "Settings":
-                    showPlaceholder(
-                            "Settings",
-                            "System settings will be available here."
-                    );
+                    showSettingsPanel();
                     break;
 
                 case "Logout":
@@ -2379,6 +2378,1288 @@ public class AdminDashboard extends JFrame {
         );
     }
 
+
+    // ==========================================================
+    // SALES HISTORY
+    // ==========================================================
+
+    private void showSalesHistoryPanel() {
+
+        JPanel panel =
+                new JPanel(new BorderLayout(10, 10));
+
+        panel.setBackground(BACKGROUND);
+        panel.setBorder(
+                BorderFactory.createEmptyBorder(25, 25, 25, 25)
+        );
+
+        JPanel header =
+                createSectionHeader(
+                        "Sales History",
+                        "View all completed pharmacy sales"
+                );
+
+        panel.add(header, BorderLayout.NORTH);
+
+        JPanel buttonPanel =
+                new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 10));
+        buttonPanel.setOpaque(false);
+
+        JButton viewButton =
+                createPrimaryButton("View Sale");
+
+        JButton refreshButton =
+                createSecondaryButton("Refresh");
+
+        buttonPanel.add(viewButton);
+        buttonPanel.add(refreshButton);
+
+        DefaultTableModel model =
+                new DefaultTableModel(
+                        new String[]{
+                                "Sale ID",
+                                "Date",
+                                "Cashier",
+                                "Total"
+                        },
+                        0
+                ) {
+                    @Override
+                    public boolean isCellEditable(int row, int column) {
+                        return false;
+                    }
+                };
+
+        JTable table = new JTable(model);
+        styleTable(table);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(
+                BorderFactory.createLineBorder(BORDER)
+        );
+
+        loadSalesHistoryTable(model);
+
+        refreshButton.addActionListener(
+                e -> loadSalesHistoryTable(model)
+        );
+
+        viewButton.addActionListener(e -> {
+
+            int selectedRow = table.getSelectedRow();
+
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Please select a sale to view.",
+                        "No Sale Selected",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+                return;
+            }
+
+            int saleId =
+                    (int) model.getValueAt(selectedRow, 0);
+
+            showSaleDetailsDialog(saleId);
+        });
+
+        JPanel centerPanel =
+                new JPanel(new BorderLayout());
+        centerPanel.setOpaque(false);
+
+        centerPanel.add(
+                buttonPanel,
+                BorderLayout.NORTH
+        );
+
+        centerPanel.add(
+                scrollPane,
+                BorderLayout.CENTER
+        );
+
+        panel.add(
+                centerPanel,
+                BorderLayout.CENTER
+        );
+
+        showContent(panel);
+    }
+
+
+    private void loadSalesHistoryTable(
+            DefaultTableModel model
+    ) {
+
+        model.setRowCount(0);
+
+        String sql =
+                "SELECT s.sale_id, s.sale_date, "
+                        + "s.total_amount, "
+                        + "COALESCE(u.full_name, 'Unknown') AS cashier "
+                        + "FROM sales s "
+                        + "LEFT JOIN users u ON s.user_id = u.user_id "
+                        + "ORDER BY s.sale_date DESC";
+
+        try (
+                Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                ResultSet rs = stmt.executeQuery()
+        ) {
+
+            while (rs.next()) {
+
+                model.addRow(new Object[]{
+                        rs.getInt("sale_id"),
+                        rs.getTimestamp("sale_date"),
+                        rs.getString("cashier"),
+                        String.format(
+                                "R%.2f",
+                                rs.getDouble("total_amount")
+                        )
+                });
+            }
+
+        } catch (SQLException e) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Could not load sales history: "
+                            + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+
+    private void showSaleDetailsDialog(int saleId) {
+
+        JDialog dialog =
+                new JDialog(
+                        this,
+                        "Sale #" + saleId,
+                        true
+                );
+
+        dialog.setSize(750, 500);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        JPanel mainPanel =
+                new JPanel(new BorderLayout(10, 10));
+
+        mainPanel.setBorder(
+                BorderFactory.createEmptyBorder(20, 20, 20, 20)
+        );
+
+        mainPanel.setBackground(BACKGROUND);
+
+        JLabel title =
+                new JLabel("Sale #" + saleId + " Details");
+
+        title.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.BOLD,
+                        22
+                )
+        );
+
+        title.setForeground(TEXT);
+
+        mainPanel.add(title, BorderLayout.NORTH);
+
+        DefaultTableModel model =
+                new DefaultTableModel(
+                        new String[]{
+                                "Medicine",
+                                "Quantity",
+                                "Price",
+                                "Subtotal"
+                        },
+                        0
+                ) {
+                    @Override
+                    public boolean isCellEditable(int row, int column) {
+                        return false;
+                    }
+                };
+
+        JTable table = new JTable(model);
+        styleTable(table);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(
+                BorderFactory.createLineBorder(BORDER)
+        );
+
+        double total = loadSaleDetails(saleId, model);
+
+        mainPanel.add(
+                scrollPane,
+                BorderLayout.CENTER
+        );
+
+        JPanel bottomPanel =
+                new JPanel(new BorderLayout());
+
+        bottomPanel.setOpaque(false);
+
+        JLabel totalLabel =
+                new JLabel(
+                        String.format(
+                                "Total: R%.2f",
+                                total
+                        )
+                );
+
+        totalLabel.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.BOLD,
+                        17
+                )
+        );
+
+        totalLabel.setForeground(PRIMARY);
+
+        JButton closeButton =
+                createSecondaryButton("Close");
+
+        closeButton.addActionListener(
+                e -> dialog.dispose()
+        );
+
+        bottomPanel.add(
+                totalLabel,
+                BorderLayout.WEST
+        );
+
+        bottomPanel.add(
+                closeButton,
+                BorderLayout.EAST
+        );
+
+        mainPanel.add(
+                bottomPanel,
+                BorderLayout.SOUTH
+        );
+
+        dialog.add(mainPanel);
+        dialog.setVisible(true);
+    }
+
+
+    private double loadSaleDetails(
+            int saleId,
+            DefaultTableModel model
+    ) {
+
+        double total = 0.0;
+
+        String sql =
+                "SELECT m.name, si.quantity_sold, "
+                        + "si.price_at_sale "
+                        + "FROM sale_items si "
+                        + "JOIN medicines m "
+                        + "ON si.medicine_id = m.medicine_id "
+                        + "WHERE si.sale_id = ? "
+                        + "ORDER BY si.sale_item_id";
+
+        try (
+                Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)
+        ) {
+
+            stmt.setInt(1, saleId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+
+                while (rs.next()) {
+
+                    int quantity =
+                            rs.getInt("quantity_sold");
+
+                    double price =
+                            rs.getDouble("price_at_sale");
+
+                    double subtotal =
+                            quantity * price;
+
+                    total += subtotal;
+
+                    model.addRow(new Object[]{
+                            rs.getString("name"),
+                            quantity,
+                            String.format("R%.2f", price),
+                            String.format("R%.2f", subtotal)
+                    });
+                }
+            }
+
+        } catch (SQLException e) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Could not load sale details: "
+                            + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+
+        return total;
+    }
+
+    // ==========================================================
+// SETTINGS
+// ==========================================================
+
+    private void showSettingsPanel() {
+
+        JPanel panel =
+                new JPanel(new BorderLayout(15, 15));
+
+        panel.setBackground(BACKGROUND);
+
+        panel.setBorder(
+                BorderFactory.createEmptyBorder(
+                        25,
+                        25,
+                        25,
+                        25
+                )
+        );
+
+
+        // ======================================================
+        // HEADER
+        // ======================================================
+
+        JPanel header =
+                createSectionHeader(
+                        "Settings",
+                        "Manage HealthFirst PIMS system configuration"
+                );
+
+        panel.add(
+                header,
+                BorderLayout.NORTH
+        );
+
+
+        // ======================================================
+        // SETTINGS CONTENT
+        // ======================================================
+
+        JPanel content =
+                new JPanel();
+
+        content.setBackground(BACKGROUND);
+
+        content.setLayout(
+                new BoxLayout(
+                        content,
+                        BoxLayout.Y_AXIS
+                )
+        );
+
+
+        // ======================================================
+        // PHARMACY INFORMATION
+        // ======================================================
+
+        JPanel pharmacyPanel =
+                createSettingsCard(
+                        "Pharmacy Information",
+                        "Information used throughout the pharmacy system"
+                );
+
+        JTextField pharmacyNameField =
+                new JTextField(
+                        getSetting("pharmacy_name", "HealthFirst Pharmacy")
+                );
+
+        JTextField addressField =
+                new JTextField(
+                        getSetting("pharmacy_address", "")
+                );
+
+        JTextField phoneField =
+                new JTextField(
+                        getSetting("pharmacy_phone", "")
+                );
+
+        JTextField emailField =
+                new JTextField(
+                        getSetting("pharmacy_email", "")
+                );
+
+        JTextField registrationField =
+                new JTextField(
+                        getSetting("pharmacy_registration", "")
+                );
+
+
+        addSettingsRow(
+                pharmacyPanel,
+                "Pharmacy Name:",
+                pharmacyNameField
+        );
+
+        addSettingsRow(
+                pharmacyPanel,
+                "Address:",
+                addressField
+        );
+
+        addSettingsRow(
+                pharmacyPanel,
+                "Phone:",
+                phoneField
+        );
+
+        addSettingsRow(
+                pharmacyPanel,
+                "Email:",
+                emailField
+        );
+
+        addSettingsRow(
+                pharmacyPanel,
+                "Registration No.:",
+                registrationField
+        );
+
+
+        JButton savePharmacyButton =
+                createPrimaryButton(
+                        "Save Pharmacy Information"
+                );
+
+
+        savePharmacyButton.addActionListener(e -> {
+
+            saveSetting(
+                    "pharmacy_name",
+                    pharmacyNameField.getText().trim()
+            );
+
+            saveSetting(
+                    "pharmacy_address",
+                    addressField.getText().trim()
+            );
+
+            saveSetting(
+                    "pharmacy_phone",
+                    phoneField.getText().trim()
+            );
+
+            saveSetting(
+                    "pharmacy_email",
+                    emailField.getText().trim()
+            );
+
+            saveSetting(
+                    "pharmacy_registration",
+                    registrationField.getText().trim()
+            );
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Pharmacy information saved successfully.",
+                    "Settings Saved",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        });
+
+
+        addSettingsButton(
+                pharmacyPanel,
+                savePharmacyButton
+        );
+
+
+        content.add(pharmacyPanel);
+
+        content.add(
+                Box.createVerticalStrut(15)
+        );
+
+
+        // ======================================================
+        // RECEIPT SETTINGS
+        // ======================================================
+
+        JPanel receiptPanel =
+                createSettingsCard(
+                        "Receipt Settings",
+                        "Control the information displayed on sales receipts"
+                );
+
+
+        JTextField receiptFooterField =
+                new JTextField(
+                        getSetting(
+                                "receipt_footer",
+                                "Thank you for choosing HealthFirst Pharmacy."
+                        )
+                );
+
+
+        JCheckBox showCashierCheck =
+                createSettingsCheckBox(
+                        "Show cashier name on receipt",
+                        getSettingBoolean(
+                                "receipt_show_cashier",
+                                true
+                        )
+                );
+
+
+        JCheckBox showDateTimeCheck =
+                createSettingsCheckBox(
+                        "Show date and time on receipt",
+                        getSettingBoolean(
+                                "receipt_show_datetime",
+                                true
+                        )
+                );
+
+
+        addSettingsRow(
+                receiptPanel,
+                "Receipt Footer:",
+                receiptFooterField
+        );
+
+
+        addSettingsComponent(
+                receiptPanel,
+                showCashierCheck
+        );
+
+        addSettingsComponent(
+                receiptPanel,
+                showDateTimeCheck
+        );
+
+
+        JButton saveReceiptButton =
+                createPrimaryButton(
+                        "Save Receipt Settings"
+                );
+
+
+        saveReceiptButton.addActionListener(e -> {
+
+            saveSetting(
+                    "receipt_footer",
+                    receiptFooterField.getText().trim()
+            );
+
+            saveSetting(
+                    "receipt_show_cashier",
+                    String.valueOf(
+                            showCashierCheck.isSelected()
+                    )
+            );
+
+            saveSetting(
+                    "receipt_show_datetime",
+                    String.valueOf(
+                            showDateTimeCheck.isSelected()
+                    )
+            );
+
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Receipt settings saved successfully.",
+                    "Settings Saved",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        });
+
+
+        addSettingsButton(
+                receiptPanel,
+                saveReceiptButton
+        );
+
+
+        content.add(receiptPanel);
+
+        content.add(
+                Box.createVerticalStrut(15)
+        );
+
+
+        // ======================================================
+        // INVENTORY SETTINGS
+        // ======================================================
+
+        JPanel inventoryPanel =
+                createSettingsCard(
+                        "Inventory Settings",
+                        "Configure stock and medicine expiry warnings"
+                );
+
+
+        JTextField reorderField =
+                new JTextField(
+                        getSetting(
+                                "default_reorder_level",
+                                "10"
+                        )
+                );
+
+
+        JTextField expiryWarningField =
+                new JTextField(
+                        getSetting(
+                                "expiry_warning_days",
+                                "30"
+                        )
+                );
+
+
+        JCheckBox preventExpiredCheck =
+                createSettingsCheckBox(
+                        "Prevent sales of expired medicines",
+                        getSettingBoolean(
+                                "prevent_expired_sales",
+                                true
+                        )
+                );
+
+
+        JCheckBox lowStockCheck =
+                createSettingsCheckBox(
+                        "Enable low-stock warnings",
+                        getSettingBoolean(
+                                "low_stock_warnings",
+                                true
+                        )
+                );
+
+
+        addSettingsRow(
+                inventoryPanel,
+                "Default Reorder Level:",
+                reorderField
+        );
+
+
+        addSettingsRow(
+                inventoryPanel,
+                "Expiry Warning (days):",
+                expiryWarningField
+        );
+
+
+        addSettingsComponent(
+                inventoryPanel,
+                preventExpiredCheck
+        );
+
+
+        addSettingsComponent(
+                inventoryPanel,
+                lowStockCheck
+        );
+
+
+        JButton saveInventoryButton =
+                createPrimaryButton(
+                        "Save Inventory Settings"
+                );
+
+
+        saveInventoryButton.addActionListener(e -> {
+
+            try {
+
+                int reorderLevel =
+                        Integer.parseInt(
+                                reorderField.getText().trim()
+                        );
+
+
+                int expiryDays =
+                        Integer.parseInt(
+                                expiryWarningField.getText().trim()
+                        );
+
+
+                if (reorderLevel < 0 ||
+                        expiryDays < 0) {
+
+                    throw new NumberFormatException();
+                }
+
+
+                saveSetting(
+                        "default_reorder_level",
+                        String.valueOf(reorderLevel)
+                );
+
+
+                saveSetting(
+                        "expiry_warning_days",
+                        String.valueOf(expiryDays)
+                );
+
+
+                saveSetting(
+                        "prevent_expired_sales",
+                        String.valueOf(
+                                preventExpiredCheck.isSelected()
+                        )
+                );
+
+
+                saveSetting(
+                        "low_stock_warnings",
+                        String.valueOf(
+                                lowStockCheck.isSelected()
+                        )
+                );
+
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Inventory settings saved successfully.",
+                        "Settings Saved",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+
+
+            } catch (NumberFormatException ex) {
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Reorder level and expiry warning must be valid positive numbers.",
+                        "Invalid Settings",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            }
+        });
+
+
+        addSettingsButton(
+                inventoryPanel,
+                saveInventoryButton
+        );
+
+
+        content.add(inventoryPanel);
+
+        content.add(
+                Box.createVerticalStrut(15)
+        );
+
+
+        // ======================================================
+        // SYSTEM INFORMATION
+        // ======================================================
+
+        JPanel systemPanel =
+                createSettingsCard(
+                        "System Information",
+                        "HealthFirst PIMS application information"
+                );
+
+
+        addInformationRow(
+                systemPanel,
+                "Application:",
+                "HealthFirst PIMS"
+        );
+
+
+        addInformationRow(
+                systemPanel,
+                "Version:",
+                "1.0.0"
+        );
+
+
+        addInformationRow(
+                systemPanel,
+                "Database:",
+                "pims_db"
+        );
+
+
+        addInformationRow(
+                systemPanel,
+                "System Status:",
+                "Connected"
+        );
+
+
+        content.add(systemPanel);
+
+
+        // ======================================================
+        // SCROLLABLE CONTENT
+        // ======================================================
+
+        JScrollPane scrollPane =
+                new JScrollPane(content);
+
+        scrollPane.setBorder(null);
+
+        scrollPane.getVerticalScrollBar()
+                .setUnitIncrement(16);
+
+        scrollPane.setBackground(BACKGROUND);
+
+        panel.add(
+                scrollPane,
+                BorderLayout.CENTER
+        );
+
+
+        showContent(panel);
+    }
+
+
+// ==========================================================
+// SETTINGS CARD
+// ==========================================================
+
+    private JPanel createSettingsCard(
+            String title,
+            String subtitle
+    ) {
+
+        JPanel card =
+                new JPanel();
+
+        card.setBackground(WHITE);
+
+        card.setBorder(
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(
+                                BORDER
+                        ),
+                        BorderFactory.createEmptyBorder(
+                                18,
+                                20,
+                                20,
+                                20
+                        )
+                )
+        );
+
+        card.setLayout(
+                new BoxLayout(
+                        card,
+                        BoxLayout.Y_AXIS
+                )
+        );
+
+
+        JLabel titleLabel =
+                new JLabel(title);
+
+        titleLabel.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.BOLD,
+                        17
+                )
+        );
+
+        titleLabel.setForeground(TEXT);
+
+
+        JLabel subtitleLabel =
+                new JLabel(subtitle);
+
+        subtitleLabel.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.PLAIN,
+                        12
+                )
+        );
+
+        subtitleLabel.setForeground(MUTED);
+
+
+        card.add(titleLabel);
+
+        card.add(
+                Box.createVerticalStrut(4)
+        );
+
+        card.add(subtitleLabel);
+
+        card.add(
+                Box.createVerticalStrut(15)
+        );
+
+
+        return card;
+    }
+
+
+// ==========================================================
+// SETTINGS ROW
+// ==========================================================
+
+    private void addSettingsRow(
+            JPanel panel,
+            String label,
+            JComponent field
+    ) {
+
+        JPanel row =
+                new JPanel(
+                        new BorderLayout(
+                                15,
+                                0
+                        )
+                );
+
+        row.setOpaque(false);
+
+        row.setMaximumSize(
+                new Dimension(
+                        Integer.MAX_VALUE,
+                        38
+                )
+        );
+
+
+        JLabel labelComponent =
+                new JLabel(label);
+
+        labelComponent.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.PLAIN,
+                        13
+                )
+        );
+
+        labelComponent.setForeground(TEXT);
+
+        labelComponent.setPreferredSize(
+                new Dimension(
+                        170,
+                        30
+                )
+        );
+
+
+        row.add(
+                labelComponent,
+                BorderLayout.WEST
+        );
+
+
+        row.add(
+                field,
+                BorderLayout.CENTER
+        );
+
+
+        panel.add(row);
+
+        panel.add(
+                Box.createVerticalStrut(8)
+        );
+    }
+
+
+// ==========================================================
+// SETTINGS CHECKBOX
+// ==========================================================
+
+    private JCheckBox createSettingsCheckBox(
+            String text,
+            boolean selected
+    ) {
+
+        JCheckBox checkBox =
+                new JCheckBox(
+                        text,
+                        selected
+                );
+
+        checkBox.setOpaque(false);
+
+        checkBox.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.PLAIN,
+                        13
+                )
+        );
+
+        checkBox.setForeground(TEXT);
+
+        checkBox.setAlignmentX(
+                Component.LEFT_ALIGNMENT
+        );
+
+
+        return checkBox;
+    }
+
+
+// ==========================================================
+// SETTINGS COMPONENT
+// ==========================================================
+
+    private void addSettingsComponent(
+            JPanel panel,
+            JComponent component
+    ) {
+
+        component.setAlignmentX(
+                Component.LEFT_ALIGNMENT
+        );
+
+        panel.add(component);
+
+        panel.add(
+                Box.createVerticalStrut(5)
+        );
+    }
+
+
+// ==========================================================
+// SETTINGS BUTTON
+// ==========================================================
+
+    private void addSettingsButton(
+            JPanel panel,
+            JButton button
+    ) {
+
+        button.setAlignmentX(
+                Component.LEFT_ALIGNMENT
+        );
+
+        panel.add(
+                Box.createVerticalStrut(5)
+        );
+
+        panel.add(button);
+    }
+
+
+// ==========================================================
+// INFORMATION ROW
+// ==========================================================
+
+    private void addInformationRow(
+            JPanel panel,
+            String label,
+            String value
+    ) {
+
+        JPanel row =
+                new JPanel(
+                        new BorderLayout()
+                );
+
+        row.setOpaque(false);
+
+        row.setMaximumSize(
+                new Dimension(
+                        Integer.MAX_VALUE,
+                        30
+                )
+        );
+
+
+        JLabel labelLabel =
+                new JLabel(label);
+
+        labelLabel.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.BOLD,
+                        13
+                )
+        );
+
+        labelLabel.setForeground(TEXT);
+
+        labelLabel.setPreferredSize(
+                new Dimension(
+                        170,
+                        30
+                )
+        );
+
+
+        JLabel valueLabel =
+                new JLabel(value);
+
+        valueLabel.setFont(
+                new Font(
+                        "Segoe UI",
+                        Font.PLAIN,
+                        13
+                )
+        );
+
+        valueLabel.setForeground(MUTED);
+
+
+        row.add(
+                labelLabel,
+                BorderLayout.WEST
+        );
+
+        row.add(
+                valueLabel,
+                BorderLayout.CENTER
+        );
+
+
+        panel.add(row);
+
+        panel.add(
+                Box.createVerticalStrut(5)
+        );
+    }
+
+
+// ==========================================================
+// GET SETTING
+// ==========================================================
+
+    private String getSetting(
+            String key,
+            String defaultValue
+    ) {
+
+        String sql =
+                "SELECT setting_value "
+                        + "FROM settings "
+                        + "WHERE setting_key = ?";
+
+
+        try (
+                Connection conn =
+                        DBConnection.getConnection();
+
+                PreparedStatement stmt =
+                        conn.prepareStatement(sql)
+        ) {
+
+            stmt.setString(
+                    1,
+                    key
+            );
+
+
+            try (
+                    ResultSet rs =
+                            stmt.executeQuery()
+            ) {
+
+                if (rs.next()) {
+
+                    return rs.getString(
+                            "setting_value"
+                    );
+                }
+            }
+
+        } catch (SQLException e) {
+
+            System.err.println(
+                    "Could not load setting '"
+                            + key
+                            + "': "
+                            + e.getMessage()
+            );
+        }
+
+
+        return defaultValue;
+    }
+
+
+// ==========================================================
+// GET BOOLEAN SETTING
+// ==========================================================
+
+    private boolean getSettingBoolean(
+            String key,
+            boolean defaultValue
+    ) {
+
+        return Boolean.parseBoolean(
+                getSetting(
+                        key,
+                        String.valueOf(
+                                defaultValue
+                        )
+                )
+        );
+    }
+
+
+// ==========================================================
+// SAVE SETTING
+// ==========================================================
+
+    private void saveSetting(
+            String key,
+            String value
+    ) {
+
+        String sql =
+                "INSERT INTO settings "
+                        + "(setting_key, setting_value) "
+                        + "VALUES (?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "setting_value = VALUES(setting_value)";
+
+
+        try (
+                Connection conn =
+                        DBConnection.getConnection();
+
+                PreparedStatement stmt =
+                        conn.prepareStatement(sql)
+        ) {
+
+            stmt.setString(
+                    1,
+                    key
+            );
+
+            stmt.setString(
+                    2,
+                    value
+            );
+
+            stmt.executeUpdate();
+
+
+        } catch (SQLException e) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Could not save setting: "
+                            + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
 
     // ==========================================================
     // ALERTS

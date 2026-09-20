@@ -2,8 +2,7 @@ DROP DATABASE IF EXISTS pims_db;
 CREATE DATABASE pims_db;
 USE pims_db;
 
-SELECT user_id, username, password, role, full_name
-FROM users;
+
 CREATE TABLE users (
     user_id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -48,9 +47,27 @@ CREATE TABLE sale_items (
     medicine_id INT NOT NULL,
     quantity_sold INT NOT NULL,
     price_at_sale DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (sale_id) REFERENCES sales(sale_id) ON DELETE CASCADE, PRIMARY KEY (supplier_id),
+    FOREIGN KEY (sale_id) REFERENCES sales(sale_id) ON DELETE CASCADE,
     FOREIGN KEY (medicine_id) REFERENCES medicines(medicine_id)
 );
+CREATE TABLE settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value VARCHAR(500) NOT NULL
+);
+
+INSERT INTO settings (setting_key, setting_value) VALUES
+('pharmacy_name', 'HealthFirst Pharmacy'),
+('pharmacy_address', ''),
+('pharmacy_phone', ''),
+('pharmacy_email', ''),
+('pharmacy_registration', ''),
+('receipt_footer', 'Thank you for choosing HealthFirst Pharmacy.'),
+('receipt_show_cashier', 'true'),
+('receipt_show_datetime', 'true'),
+('default_reorder_level', '10'),
+('expiry_warning_days', '30'),
+('prevent_expired_sales', 'true'),
+('low_stock_warnings', 'true');
 
 INSERT INTO users (username, password, role, full_name) VALUES
 ('admin', 'admin123', 'Admin', 'System Administrator'),
@@ -67,3 +84,5 @@ INSERT INTO medicines (name, company, medicine_type, price, quantity_in_stock, r
 ('Corenza C', 'Aspen Pharmacare', 'Syrup', 65.00, 8, 10, '2026-09-30', 2),
 ('Insulin Actrapid', 'Novo Nordisk', 'Injection', 250.00, 30, 5, '2026-10-05', 3),
 ('Betamethasone Cream', 'GSK', 'Cream', 55.75, 25, 10, '2027-01-10', 1);
+
+SHOW TABLES;
