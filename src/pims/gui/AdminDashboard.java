@@ -1,5 +1,6 @@
 package pims.gui;
 
+import pims.gui.admin.DashboardPanel;
 import pims.components.Sidebar;
 import pims.util.DBConnection;
 import pims.dao.MedicineDAO;
@@ -199,23 +200,18 @@ public class AdminDashboard extends JFrame {
     // DASHBOARD
     // ==========================================================
 
+
     private void showDashboard() {
 
-        JPanel dashboard =
-                new JPanel(new BorderLayout());
-
-        dashboard.setBackground(
-                BACKGROUND
-        );
-
-        dashboard.setBorder(
-                BorderFactory.createEmptyBorder(
-                        30,
-                        30,
-                        30,
-                        30
+        showContent(
+                new DashboardPanel(
+                        medicineDAO,
+                        supplierDAO,
+                        userDAO
                 )
         );
+
+
 
 
         // ======================================================
@@ -276,12 +272,6 @@ public class AdminDashboard extends JFrame {
         );
 
         headerPanel.add(subtitle);
-
-
-        dashboard.add(
-                headerPanel,
-                BorderLayout.NORTH
-        );
 
 
         // ======================================================
@@ -356,12 +346,6 @@ public class AdminDashboard extends JFrame {
                         String.valueOf(lowStockCount),
                         "Items needing attention"
                 )
-        );
-
-
-        dashboard.add(
-                cardsPanel,
-                BorderLayout.CENTER
         );
 
 
@@ -460,14 +444,6 @@ public class AdminDashboard extends JFrame {
                 BorderLayout.CENTER
         );
 
-
-        dashboard.add(
-                quickPanel,
-                BorderLayout.SOUTH
-        );
-
-
-        showContent(dashboard);
     }
 
 
