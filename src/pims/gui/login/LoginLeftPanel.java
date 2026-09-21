@@ -293,8 +293,8 @@ public class LoginLeftPanel extends JPanel {
                 new JLabel(
                         new SvgIcon(
                                 iconPath,
-                                20,
-                                20
+                                18,
+                                18
                         )
                 );
 
