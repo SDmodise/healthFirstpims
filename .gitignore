@@ -7,7 +7,7 @@
 
 # Build directories
 out/
-taget/
+target/
 
 # Operating system files
 .DS_Store
