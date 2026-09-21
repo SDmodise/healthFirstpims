@@ -51,7 +51,7 @@ Cashiers will be able to
 
 ## Project Status 
 
-Development in progress
+Finished
 
 ## Developer 
 
